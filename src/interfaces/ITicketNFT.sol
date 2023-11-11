@@ -149,4 +149,9 @@ interface ITicketNFT {
      * - `ticketID` must exist
      */
     function isExpiredOrUsed(uint256 ticketID) external view returns (bool);
+
+    /**
+    * @dev Returns the maximum number of tickets that can be created for the event.
+    */
+    function maxNumberOfTickets() external view returns (uint256);
 }
