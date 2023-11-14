@@ -21,7 +21,6 @@ contract PrimaryMarket is IPrimaryMarket {
     }
 
     // Mapping from TicketNFT address to its details
-    mapping(address => EventDetails) private ticketNFTDetails;
 
     constructor(address _paymentTokenAddress) {
         paymentToken = IERC20(_paymentTokenAddress);

@@ -31,6 +31,21 @@ contract SecondaryMarket is ISecondaryMarket {
         purchaseToken = IERC20(_purchaseToken);
     }
 
+    function getHighestBid(
+    address ticketCollection,
+    uint256 ticketId
+    ) external view override returns (uint256) {
+        return listings[ticketCollection][ticketId].highestBid;
+    }
+
+    function getHighestBidder(
+        address ticketCollection,
+        uint256 ticketId
+    ) external view override returns (address) {
+        return listings[ticketCollection][ticketId].highestBidder;
+    }
+
+
    function listTicket(
     address ticketCollection,
     uint256 ticketID,
@@ -80,11 +95,12 @@ contract SecondaryMarket is ISecondaryMarket {
         // Transfer bid amount from bidder to contract
         purchaseToken.transferFrom(msg.sender, address(this), bidAmount);
 
-        // Update the listing with the new highest bid
+        // Update the listing with the new highest bid and bidder's name
         listing.highestBidder = msg.sender;
         listing.highestBid = bidAmount;
+        listing.highestBidderName = name;
 
-        emit Purchase(msg.sender, ticketCollection, ticketID, bidAmount, name);
+        emit BidSubmitted(msg.sender, ticketCollection, ticketID, bidAmount, name);
     }
 
     function acceptBid(address ticketCollection, uint256 ticketID) external override {
@@ -105,6 +121,9 @@ contract SecondaryMarket is ISecondaryMarket {
         // Transfer the ticket to the highest bidder
         ITicketNFT(ticketCollection).updateHolderName(ticketID, listing.highestBidderName);
         ITicketNFT(ticketCollection).transferFrom(address(this), listing.highestBidder, ticketID);
+
+        // Emit BidAccepted event
+        emit BidAccepted(listing.highestBidder, ticketCollection, ticketID, listing.highestBid, listing.highestBidderName);
 
         // Remove the listing
         delete listings[ticketCollection][ticketID];
