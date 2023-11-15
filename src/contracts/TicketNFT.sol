@@ -4,12 +4,11 @@ pragma solidity ^0.8.10;
 import "../interfaces/ITicketNFT.sol";
 
 contract TicketNFT is ITicketNFT {
-
     uint256 private _currentTicketId = 0;
     address private _creator;
     string private _eventName;
     uint256 private _maxNumberofTickets;
-
+    address private _primaryMarket;
     
     mapping(uint256 => address) private _ticketOwners;
     mapping(address => uint256) private _ownerTicketCount;
@@ -17,10 +16,9 @@ contract TicketNFT is ITicketNFT {
     mapping(uint256 => uint256) private _ticketExpiryDates;
     mapping(uint256 => bool) private _ticketUsedFlags;
     mapping(uint256 => address) private _ticketApprovals;
-    mapping(uint256 => string) private _ticketEventNames;
 
-    modifier onlyCreator() {
-        require(msg.sender == _creator, "Caller is not the creator");
+    modifier onlyCreatorOrPrimaryMarket() {
+        require(msg.sender == _primaryMarket || msg.sender == _creator, "Caller is not the creator" );
         _;
     }
 
@@ -34,27 +32,20 @@ contract TicketNFT is ITicketNFT {
         _;
     }
 
-    // constructor() {
-    //     _creator = msg.sender;
-    // }
-
-    constructor(string memory eventName,uint256 maxNumberofTickets) { 
-        // TODO
-        _creator = msg.sender;
-        _eventName = eventName;
-        _maxNumberofTickets = maxNumberofTickets;
-
+    constructor(string memory newEventName, uint256 newMaxNumberOfTickets, address creator_address, address primaryMarket) {
+        _creator = creator_address;
+        _primaryMarket = primaryMarket;
+        _eventName = newEventName;
+        _maxNumberofTickets = newMaxNumberOfTickets;
     }
 
-    function maxNumberOfTickets() external view override returns (uint256) {
-        return _maxNumberofTickets;
+    function eventName() external view override returns (string memory) {
+        return _eventName;
     }
 
-    function creator() external view override returns (address) {
-        return _creator;
-    }
+    function mint(address holder, string memory holderName) external override onlyCreatorOrPrimaryMarket returns (uint256 id) {
+        require(_currentTicketId < _maxNumberofTickets, "Max ticket limit reached");
 
-    function mint(address holder, string memory holderName) external onlyCreator {
         _currentTicketId++;
         uint256 newTicketId = _currentTicketId;
 
@@ -65,6 +56,15 @@ contract TicketNFT is ITicketNFT {
         _ticketUsedFlags[newTicketId] = false;
 
         emit Transfer(address(0), holder, newTicketId);
+        return newTicketId;
+    }
+
+    function maxNumberOfTickets() external view override returns (uint256) {
+        return _maxNumberofTickets;
+    }
+
+    function creator() external view override returns (address) {
+        return _creator;
     }
 
     function balanceOf(address holder) external view override returns (uint256 balance) {
@@ -105,7 +105,7 @@ contract TicketNFT is ITicketNFT {
         _ticketHolderNames[ticketID] = newName;
     }
 
-    function setUsed(uint256 ticketID) external override onlyCreator ticketExists(ticketID) {
+    function setUsed(uint256 ticketID) external override onlyCreatorOrPrimaryMarket ticketExists(ticketID) {
         require(!_ticketUsedFlags[ticketID], "Ticket is already used");
         require(block.timestamp <= _ticketExpiryDates[ticketID], "Ticket has expired");
 
@@ -116,7 +116,4 @@ contract TicketNFT is ITicketNFT {
         return _ticketUsedFlags[ticketID] || block.timestamp > _ticketExpiryDates[ticketID];
     }
 
-    function eventNameOf(uint256 ticketID) external view ticketExists(ticketID) returns (string memory) {
-        return _ticketEventNames[ticketID];
-    }
 }
