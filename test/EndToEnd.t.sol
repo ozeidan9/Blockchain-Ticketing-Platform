@@ -14,12 +14,12 @@ contract EndToEnd is Test {
 
     address public alice = makeAddr("alice");
     address public bob = makeAddr("bob");
-    address public charlie = makeAddr("charlie");
+    address public charlie = makeAddr("charlie");    
 
     function setUp() public {
         purchaseToken = new PurchaseToken();
         primaryMarket = new PrimaryMarket(address(purchaseToken)); // Change to address(purchaseToken)
-        secondaryMarket = new SecondaryMarket(address(purchaseToken)); // Change to address(purchaseToken)
+        secondaryMarket = new SecondaryMarket(IERC20(address(purchaseToken)));
 
         payable(alice).transfer(1e18);
         payable(bob).transfer(2e18);

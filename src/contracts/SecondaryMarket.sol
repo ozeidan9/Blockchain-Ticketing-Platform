@@ -12,65 +12,60 @@ contract SecondaryMarket is ISecondaryMarket {
     // ERC20 token used for transactions
     IERC20 public purchaseToken;
 
-    // Define a struct to hold the listing information
-    struct TicketListingInfo {
-        address holder;
-        uint256 price;
-        address highestBidder;
-        uint256 highestBid;
-        string highestBidderName; 
+    struct Bid { 
+        string name; 
+        address bidder;
+        uint256 amount; 
     }
 
-    // Mapping from ticket collection and ticketID to their respective listing
-    mapping(address => mapping(uint256 => TicketListingInfo)) public listings;
+    struct TicketListing {
+        address seller;
+        uint256 price;
+        bool isListed; 
+    }
+
+    // Mapping from ticket collection and ticketID to their respective listing    
+    mapping(address => mapping(uint256 => Bid)) public ticketBids; 
+    mapping(address => TicketListing) public List;
 
     // Reference to the ITicketNFT interface
     ITicketNFT private ticketNFT;
 
-    constructor(address _purchaseToken) {
+    constructor(IERC20 _purchaseToken) {
         purchaseToken = IERC20(_purchaseToken);
     }
-
-    function getHighestBid(
-    address ticketCollection,
-    uint256 ticketId
-    ) external view override returns (uint256) {
-        return listings[ticketCollection][ticketId].highestBid;
-    }
-
-    function getHighestBidder(
-        address ticketCollection,
-        uint256 ticketId
-    ) external view override returns (address) {
-        return listings[ticketCollection][ticketId].highestBidder;
-    }
-
 
    function listTicket(
     address ticketCollection,
     uint256 ticketID,
     uint256 price
     ) external override {
-        // Make sure the ticket exists and is not expired or used
         require(
             !ITicketNFT(ticketCollection).isExpiredOrUsed(ticketID),
             "Ticket is expired or already used"
         );
-
+        require(
+            ITicketNFT(ticketCollection).holderOf(ticketID) == msg.sender, 
+            "Caller is not ticket owner"
+        );
+        
+        
         // Transfer the ticket to this contract
         ITicketNFT(ticketCollection).transferFrom(msg.sender, address(this), ticketID);
+        ITicketNFT(ticketCollection).approve(address(this),ticketID);
 
-        // Create the listing in the internal mapping
-        listings[ticketCollection][ticketID] = TicketListingInfo({
-            holder: msg.sender,
-            price: price,
-            highestBidder: address(0),
-            highestBid: 0,
-            highestBidderName: ""
-
+        List[ticketCollection] = TicketListing({ 
+            seller: msg.sender, 
+            price: price, 
+            isListed: true
+        }); 
+        ticketBids[ticketCollection][ticketID] = Bid({ 
+            name: "", 
+            bidder: 
+            address(0),
+            amount: price 
         });
 
-        // Emit the Listing event as defined in the ISecondaryMarket interface
         emit Listing(msg.sender, ticketCollection, ticketID, price);
     }
 
@@ -81,69 +76,78 @@ contract SecondaryMarket is ISecondaryMarket {
         uint256 bidAmount,
         string calldata name
     ) external override {
-        TicketListingInfo storage listing = listings[ticketCollection][ticketID];
+        TicketListing storage listing = List[ticketCollection];    
+        
         require(
-            bidAmount > listing.highestBid,
+            bidAmount > ticketBids[ticketCollection][ticketID].amount,
             "Bid must be higher than the current highest"
         );
+        require(listing.isListed, "Ticket not listed"); 
         
-        // Refund the previous highest bidder if there is one
-        if (listing.highestBidder != address(0)) {
-            purchaseToken.transfer(listing.highestBidder, listing.highestBid);
+        // Refund the previous highest bidder        
+        Bid memory currentHighestBid = ticketBids[ticketCollection][ticketID]; 
+        if (currentHighestBid.amount > 0 && currentHighestBid.bidder != address(0)) { 
+            purchaseToken.transfer(currentHighestBid.bidder, currentHighestBid.amount); 
         }
+        // Transfer the new bid amount to the contract       
+        purchaseToken.transferFrom(msg.sender, address(this), bidAmount); 
+        purchaseToken.approve(address(this), bidAmount);
+    
+        // Update the highest bid        
+        ticketBids[ticketCollection][ticketID] = Bid(name, msg.sender, bidAmount);
 
-        // Transfer bid amount from bidder to contract
-        purchaseToken.transferFrom(msg.sender, address(this), bidAmount);
-
-        // Update the listing with the new highest bid and bidder's name
-        listing.highestBidder = msg.sender;
-        listing.highestBid = bidAmount;
-        listing.highestBidderName = name;
-
+        // Emit an event for the new highest bid        
         emit BidSubmitted(msg.sender, ticketCollection, ticketID, bidAmount, name);
     }
 
     function acceptBid(address ticketCollection, uint256 ticketID) external override {
-        TicketListingInfo storage listing = listings[ticketCollection][ticketID];
-        require(listing.highestBidder != address(0), "No bid to accept");
 
-        // Calculate the fee and the amount to transfer to the ticket holder
-        uint256 fee = (listing.highestBid * FEE_PERCENTAGE) / 100;
-        uint256 amountToHolder = listing.highestBid - fee;
-
-        // Transfer the ERC20 tokens to the ticket holder minus the fee
-        purchaseToken.transfer(listing.holder, amountToHolder);
-
-        // Transfer the fee to the creator of the ticket collection
-        address creator = ITicketNFT(ticketCollection).creator();
-        purchaseToken.transfer(creator, fee);
-
-        // Transfer the ticket to the highest bidder
-        ITicketNFT(ticketCollection).updateHolderName(ticketID, listing.highestBidderName);
-        ITicketNFT(ticketCollection).transferFrom(address(this), listing.highestBidder, ticketID);
-
-        // Emit BidAccepted event
-        emit BidAccepted(listing.highestBidder, ticketCollection, ticketID, listing.highestBid, listing.highestBidderName);
-
-        // Remove the listing
-        delete listings[ticketCollection][ticketID];
+        TicketListing memory listing = List[ticketCollection]; 
+        // require(listing.isListed, "Ticket not listed"); 
+        require(listing.seller == msg.sender, "Only seller can accept bid");
+        Bid memory bid = ticketBids[ticketCollection][ticketID];
+         // Calculate and transfer fees      
+        uint256 fee = calculateFee(bid.amount);
+        purchaseToken.transfer(ITicketNFT(ticketCollection).creator(), fee);
+        // Transfer funds to seller minus fee       
+        purchaseToken.transfer(listing.seller, bid.amount - fee);
+        
+        // Transfer ticket to winning bidder
+        ITicketNFT(ticketCollection).updateHolderName(ticketID, bid.name); 
+        ITicketNFT(ticketCollection).transferFrom(address(this), bid.bidder, ticketID);
+        emit BidAccepted(bid.bidder, ticketCollection, ticketID, bid.amount, "");
+        // Clear listing and bid    
+        delete ticketBids[ticketCollection][ticketID];
     }
 
     function delistTicket(address ticketCollection, uint256 ticketID) external override {
-        TicketListingInfo storage listing = listings[ticketCollection][ticketID];
-        require(msg.sender == listing.holder, "Only the lister can delist the ticket");
 
-        // Refund the highest bidder if there is one
-        if (listing.highestBidder != address(0)) {
-            purchaseToken.transfer(listing.highestBidder, listing.highestBid);
+        TicketListing memory listing = List[ticketCollection]; 
+        require(listing.isListed, "Ticket not listed"); 
+        require(listing.seller == msg.sender, "Only seller can delist");
+        
+        // Return bid amount to the current highest bidder        
+        Bid memory currentBid = ticketBids[ticketCollection][ticketID]; 
+        if (currentBid.amount > 0 && currentBid.bidder != address(0)) { 
+            purchaseToken.transfer(currentBid.bidder, currentBid.amount); 
         }
-
-        // Transfer the ticket back to the lister
-        ITicketNFT(ticketCollection).transferFrom(address(this), msg.sender, ticketID);
-
-        // Remove the listing
-        delete listings[ticketCollection][ticketID];
-
+        
+        // Transfer ticket back to the seller        
+        ITicketNFT(ticketCollection).transferFrom(address(this), listing.seller, ticketID);
+        
+        // Clear listing and bid
+        delete ticketBids[ticketCollection][ticketID];
         emit Delisting(ticketCollection, ticketID);
+    }
+
+    function getHighestBid(address ticketCollection, uint256 ticketID) external view override returns (uint256) { 
+        return ticketBids[ticketCollection][ticketID].amount; 
+    }
+    function getHighestBidder(address ticketCollection, uint256 ticketID) external view override returns (address) {
+        return ticketBids[ticketCollection][ticketID].bidder; 
+    }
+    function calculateFee(uint256 amount) private pure returns (uint256) {
+        // Calculate fee, for example, 5%
+        return (amount * FEE_PERCENTAGE) / 100;
     }
 }
