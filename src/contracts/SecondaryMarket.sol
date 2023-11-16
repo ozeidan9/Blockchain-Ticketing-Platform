@@ -12,21 +12,23 @@ contract SecondaryMarket is ISecondaryMarket {
     // ERC20 token used for transactions
     IERC20 public purchaseToken;
 
-    struct Bid { 
-        string name; 
-        address bidder;
-        uint256 amount; 
-    }
-
-    struct TicketListing {
+    struct SaleDetails {
         address seller;
         uint256 price;
         bool isListed; 
     }
 
+    struct BidDetails { 
+        string name; 
+        address bidder;
+        uint256 amount; 
+    }
+
+    
+
     // Mapping from ticket collection and ticketID to their respective listing    
-    mapping(address => mapping(uint256 => Bid)) public ticketBids; 
-    mapping(address => TicketListing) public List;
+    mapping(address => mapping(uint256 => BidDetails)) public ticketBids; 
+    mapping(address => SaleDetails) public List;
 
     // Reference to the ITicketNFT interface
     ITicketNFT private ticketNFT;
@@ -54,15 +56,14 @@ contract SecondaryMarket is ISecondaryMarket {
         ITicketNFT(ticketCollection).transferFrom(msg.sender, address(this), ticketID);
         ITicketNFT(ticketCollection).approve(address(this),ticketID);
 
-        List[ticketCollection] = TicketListing({ 
+        List[ticketCollection] = SaleDetails({ 
             seller: msg.sender, 
             price: price, 
             isListed: true
         }); 
-        ticketBids[ticketCollection][ticketID] = Bid({ 
+        ticketBids[ticketCollection][ticketID] = BidDetails({ 
             name: "", 
-            bidder: 
-            address(0),
+            bidder: address(0),
             amount: price 
         });
 
@@ -76,16 +77,16 @@ contract SecondaryMarket is ISecondaryMarket {
         uint256 bidAmount,
         string calldata name
     ) external override {
-        TicketListing storage listing = List[ticketCollection];    
+        SaleDetails storage listing = List[ticketCollection];    
         
         require(
             bidAmount > ticketBids[ticketCollection][ticketID].amount,
-            "Bid must be higher than the current highest"
+            "BidDetails must be higher than the current highest"
         );
         require(listing.isListed, "Ticket not listed"); 
         
         // Refund the previous highest bidder        
-        Bid memory currentHighestBid = ticketBids[ticketCollection][ticketID]; 
+        BidDetails memory currentHighestBid = ticketBids[ticketCollection][ticketID]; 
         if (currentHighestBid.amount > 0 && currentHighestBid.bidder != address(0)) { 
             purchaseToken.transfer(currentHighestBid.bidder, currentHighestBid.amount); 
         }
@@ -94,7 +95,7 @@ contract SecondaryMarket is ISecondaryMarket {
         purchaseToken.approve(address(this), bidAmount);
     
         // Update the highest bid        
-        ticketBids[ticketCollection][ticketID] = Bid(name, msg.sender, bidAmount);
+        ticketBids[ticketCollection][ticketID] = BidDetails(name, msg.sender, bidAmount);
 
         // Emit an event for the new highest bid        
         emit BidSubmitted(msg.sender, ticketCollection, ticketID, bidAmount, name);
@@ -102,10 +103,10 @@ contract SecondaryMarket is ISecondaryMarket {
 
     function acceptBid(address ticketCollection, uint256 ticketID) external override {
 
-        TicketListing memory listing = List[ticketCollection]; 
+        SaleDetails memory listing = List[ticketCollection]; 
         // require(listing.isListed, "Ticket not listed"); 
         require(listing.seller == msg.sender, "Only seller can accept bid");
-        Bid memory bid = ticketBids[ticketCollection][ticketID];
+        BidDetails memory bid = ticketBids[ticketCollection][ticketID];
          // Calculate and transfer fees      
         uint256 fee = calculateFee(bid.amount);
         purchaseToken.transfer(ITicketNFT(ticketCollection).creator(), fee);
@@ -122,12 +123,12 @@ contract SecondaryMarket is ISecondaryMarket {
 
     function delistTicket(address ticketCollection, uint256 ticketID) external override {
 
-        TicketListing memory listing = List[ticketCollection]; 
+        SaleDetails memory listing = List[ticketCollection]; 
         require(listing.isListed, "Ticket not listed"); 
         require(listing.seller == msg.sender, "Only seller can delist");
         
         // Return bid amount to the current highest bidder        
-        Bid memory currentBid = ticketBids[ticketCollection][ticketID]; 
+        BidDetails memory currentBid = ticketBids[ticketCollection][ticketID]; 
         if (currentBid.amount > 0 && currentBid.bidder != address(0)) { 
             purchaseToken.transfer(currentBid.bidder, currentBid.amount); 
         }
