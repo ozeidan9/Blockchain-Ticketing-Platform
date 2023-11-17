@@ -14,12 +14,12 @@ contract EndToEnd is Test {
 
     address public alice = makeAddr("alice");
     address public bob = makeAddr("bob");
-    address public charlie = makeAddr("charlie");    
+    address public charlie = makeAddr("charlie");
 
     function setUp() public {
         purchaseToken = new PurchaseToken();
-        primaryMarket = new PrimaryMarket(address(purchaseToken)); // Change to address(purchaseToken)
-        secondaryMarket = new SecondaryMarket(IERC20(address(purchaseToken)));
+        primaryMarket = new PrimaryMarket(purchaseToken);
+        secondaryMarket = new SecondaryMarket(purchaseToken);
 
         payable(alice).transfer(1e18);
         payable(bob).transfer(2e18);
@@ -37,9 +37,6 @@ contract EndToEnd is Test {
         );
 
         assertEq(ticketNFT.creator(), charlie);
-        // Replace the line below with the correct way to access the max number of tickets.
-        // If the maxNumberOfTickets is a public state variable, it should be accessed as a function.
-        // If it is not defined, you need to define it in the ITicketNFT and implement it in TicketNFT.
         assertEq(ticketNFT.maxNumberOfTickets(), 100);
         assertEq(primaryMarket.getPrice(address(ticketNFT)), ticketPrice);
 

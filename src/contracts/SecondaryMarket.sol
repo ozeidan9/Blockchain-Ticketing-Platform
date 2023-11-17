@@ -1,40 +1,32 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.10;
 
+import "./PurchaseToken.sol";
 import "./TicketNFT.sol";
 import "../interfaces/ISecondaryMarket.sol";
 import "../interfaces/IERC20.sol";
 
 contract SecondaryMarket is ISecondaryMarket {
-    // Define the fee as 5%
     uint256 public constant FEE_PERCENTAGE = 5;
-
-    // ERC20 token used for transactions
     IERC20 public purchaseToken;
-
+    ITicketNFT private ticketNFT;
+   
     struct SaleDetails {
         address seller;
         uint256 price;
         bool isListed; 
     }
-
     struct BidDetails { 
         string name; 
         address bidder;
         uint256 amount; 
     }
 
-    
-
-    // Mapping from ticket collection and ticketID to their respective listing    
     mapping(address => mapping(uint256 => BidDetails)) public ticketBids; 
     mapping(address => SaleDetails) public List;
 
-    // Reference to the ITicketNFT interface
-    ITicketNFT private ticketNFT;
-
-    constructor(IERC20 _purchaseToken) {
-        purchaseToken = IERC20(_purchaseToken);
+    constructor(PurchaseToken _purchaseToken) {
+        purchaseToken = IERC20(address((_purchaseToken)));
     }
 
    function listTicket(

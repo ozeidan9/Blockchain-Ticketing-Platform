@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
+import "./PurchaseToken.sol";
 import "../interfaces/IPrimaryMarket.sol";
 import "./TicketNFT.sol";
 import "../interfaces/IERC20.sol";
@@ -17,9 +18,9 @@ contract PrimaryMarket is IPrimaryMarket {
         uint256 ticketsMinted;
     }
 
-    constructor(address _paymentTokenAddress) {
-    paymentToken = IERC20(_paymentTokenAddress);
-}
+    constructor(PurchaseToken _paymentToken) {
+        paymentToken = IERC20(address((_paymentToken)));
+    }
 
 
     function createNewEvent(
@@ -63,7 +64,7 @@ contract PrimaryMarket is IPrimaryMarket {
     ) external override returns (uint256 id) {
         EventDetails storage details = ticketNFTDetails[ticketCollection];
         require(details.ticketsMinted < details.maxNumberOfTickets, "All tickets have been minted");
-        require(paymentToken.transferFrom(msg.sender, details.creator, details.price), "Payment failed");
+        paymentToken.transferFrom(msg.sender, details.creator, details.price);
         uint256 newTicketId = ITicketNFT(ticketCollection).mint(msg.sender, holderName);
         details.ticketsMinted++;
 
