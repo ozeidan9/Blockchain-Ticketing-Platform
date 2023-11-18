@@ -20,6 +20,7 @@ contract SecondaryMarketTest is Test {
 
     uint256 ticketId;
 
+
     function setUp() public {
         purchaseToken = new PurchaseToken();
         primaryMarket = new PrimaryMarket(purchaseToken);
@@ -28,9 +29,11 @@ contract SecondaryMarketTest is Test {
         payable(alice).transfer(1e18);
         payable(bob).transfer(2e18);
 
-        ticketNFT = new TicketNFT("Event", 100, charlie, address(this));
+        vm.startPrank(address(primaryMarket));
+        ticketNFT = new TicketNFT("Event", 100, charlie, address(primaryMarket));
         ticketNFT.mint(alice, "Alice");
         ticketId = 1;  // Assuming ticketId is 1 for the first mint
+        vm.stopPrank();
     }
 
     function prepareAliceWithTokensAndApproval(uint256 amount) internal {
@@ -53,6 +56,13 @@ contract SecondaryMarketTest is Test {
         ticketNFT.approve(address(secondaryMarket), ticketId);
         secondaryMarket.listTicket(address(ticketNFT), ticketId, 1 ether);
         vm.stopPrank();
+
+        // Accessing the SaleDetails
+        // need to have seller address, ticket price, and isListed
+        SecondaryMarket.SaleDetails memory listing = secondaryMarket.getSaleDetails(address(ticketNFT));
+        assertEq(listing.seller, alice);
+        assertEq(listing.price, 1 ether);
+        assertTrue(listing.isListed);
     }
 
     function testSubmitBid() public {
@@ -61,6 +71,12 @@ contract SecondaryMarketTest is Test {
         vm.startPrank(bob);
         secondaryMarket.submitBid(address(ticketNFT), ticketId, 1.5 ether, "Bob");
         vm.stopPrank();
+
+        // Assertions to verify bid
+        SecondaryMarket.BidDetails memory bid = secondaryMarket.getBidDetails(address(ticketNFT), ticketId);
+        assertEq(bid.name, "Bob");
+        assertEq(bid.bidder, bob);
+        assertEq(bid.amount, 1.5 ether);
     }
 
     function testAcceptBid() public {
@@ -68,6 +84,9 @@ contract SecondaryMarketTest is Test {
         vm.startPrank(alice);
         secondaryMarket.acceptBid(address(ticketNFT), ticketId);
         vm.stopPrank();
+
+        // Assertions to verify bid acceptance
+        assertEq(ticketNFT.holderOf(ticketId), bob);
     }
 
     function testDelistTicket() public {
@@ -75,17 +94,25 @@ contract SecondaryMarketTest is Test {
         vm.startPrank(alice);
         secondaryMarket.delistTicket(address(ticketNFT), ticketId);
         vm.stopPrank();
+
+        // Assertions to verify delisting
+        SecondaryMarket.SaleDetails memory listing = secondaryMarket.getSaleDetails(address(ticketNFT));
+        assertTrue(listing.isListed);
     }
 
+    // Failure tests with assertions
     function testFailListTicketNotOwner() public {
-        vm.startPrank(bob); // Bob, who is not the owner, tries to list the ticket
+        vm.startPrank(bob);
         ticketNFT.mint(alice, "Alice");
-        ticketId = 1; // Assuming the first minted ticketId is 1
+        ticketId = 1;
         vm.expectRevert("Caller is not ticket owner");
         secondaryMarket.listTicket(address(ticketNFT), ticketId, 1 ether);
         vm.stopPrank();
-    }
 
+        // Assertion to verify ticket not listed by non-owner
+        SecondaryMarket.SaleDetails memory listing = secondaryMarket.getSaleDetails(address(ticketNFT));
+        assertTrue(listing.isListed);
+    }
 
     function testFailSubmitBidLowAmount() public {
         testListTicket();
@@ -94,25 +121,32 @@ contract SecondaryMarketTest is Test {
         vm.expectRevert("Bid must be higher than the current highest");
         secondaryMarket.submitBid(address(ticketNFT), ticketId, 0.5 ether, "Bob");
         vm.stopPrank();
+
+        // Assertion to verify bid not submitted
+        SecondaryMarket.BidDetails memory bid = secondaryMarket.getBidDetails(address(ticketNFT), ticketId);
+        assert(bid.amount != 0.5 ether);
     }
 
     function testFailAcceptBidNotSeller() public {
-        // Ensure Alice lists the ticket and Bob makes a bid
-        testListTicket();
         testSubmitBid();
-
-        vm.startPrank(charlie); // Charlie, not the seller, tries to accept the bid
+        vm.startPrank(charlie);
         vm.expectRevert("Only seller can accept bid");
         secondaryMarket.acceptBid(address(ticketNFT), ticketId);
         vm.stopPrank();
+
+        // Assertion to verify bid not accepted by non-seller
+        assertEq(ticketNFT.holderOf(ticketId), alice);
     }
 
     function testFailDelistTicketNotSeller() public {
-        testListTicket(); // Alice lists the ticket
-        vm.prank(charlie);
-        vm.startPrank(charlie); // Charlie, not the seller, tries to delist
+        testListTicket();
+        vm.startPrank(charlie);
         vm.expectRevert("Only seller can delist");
         secondaryMarket.delistTicket(address(ticketNFT), ticketId);
         vm.stopPrank();
+
+        // // Assertion to verify ticket not delisted by non-seller
+        SecondaryMarket.SaleDetails memory listing = secondaryMarket.getSaleDetails(address(ticketNFT));
+        assertTrue(listing.isListed);
     }
 }

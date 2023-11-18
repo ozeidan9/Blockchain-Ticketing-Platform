@@ -115,9 +115,9 @@ contract SecondaryMarket is ISecondaryMarket {
 
     function delistTicket(address ticketCollection, uint256 ticketID) external override {
 
-        SaleDetails memory listing = List[ticketCollection]; 
-        require(listing.isListed, "Ticket not listed"); 
+        SaleDetails memory listing = List[ticketCollection];
         require(listing.seller == msg.sender, "Only seller can delist");
+        require(listing.isListed, "Ticket not listed"); 
         
         // Return bid amount to the current highest bidder        
         BidDetails memory currentBid = ticketBids[ticketCollection][ticketID]; 
@@ -142,5 +142,11 @@ contract SecondaryMarket is ISecondaryMarket {
     function calculateFee(uint256 amount) private pure returns (uint256) {
         // Calculate fee, for example, 5%
         return (amount * FEE_PERCENTAGE) / 100;
+    }
+    function getSaleDetails(address ticketCollection) external view returns (SaleDetails memory) {
+        return List[ticketCollection];
+    }
+    function getBidDetails(address ticketCollection, uint256 ticketID) external view returns (BidDetails memory) {
+        return ticketBids[ticketCollection][ticketID];
     }
 }
