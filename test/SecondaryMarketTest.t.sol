@@ -1,81 +1,118 @@
-// // SPDX-License-Identifier: UNLICENSED
-// pragma solidity ^0.8.10;
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.10;
 
-// import "forge-std/Test.sol";
-// import "../src/contracts/PurchaseToken.sol";
-// import "../src/contracts/TicketNFT.sol";
-// import "../src/contracts/SecondaryMarket.sol";
-// import "../src/interfaces/ISecondaryMarket.sol";
+import "forge-std/Test.sol";
+import "../src/contracts/PurchaseToken.sol";
+import "../src/contracts/TicketNFT.sol";
+import "../src/contracts/PrimaryMarket.sol";
+import "../src/contracts/SecondaryMarket.sol";
+import "../src/interfaces/ISecondaryMarket.sol";
 
-// contract SecondaryMarketTest is Test{
-//     SecondaryMarket secondaryMarket;
-//     PurchaseToken purchaseToken;
-//     TicketNFT ticketNFT;
+contract SecondaryMarketTest is Test {
+    SecondaryMarket secondaryMarket;
+    PurchaseToken purchaseToken;
+    PrimaryMarket primaryMarket;
+    TicketNFT ticketNFT;
 
-//     address alice = makeAddr("alice");
-//     address bob = makeAddr("bob");
-//     address charlie = makeAddr("charlie");
+    address alice = makeAddr("alice");
+    address bob = makeAddr("bob");
+    address charlie = makeAddr("charlie");
 
-//     uint256 ticketId;
+    uint256 ticketId;
 
-//     function setUp() public {
-//         purchaseToken = new PurchaseToken();
-//         ticketNFT = new TicketNFT("Event", 100, charlie, address(this));
-//         secondaryMarket = new SecondaryMarket(purchaseToken);
+    function setUp() public {
+        purchaseToken = new PurchaseToken();
+        primaryMarket = new PrimaryMarket(purchaseToken);
+        secondaryMarket = new SecondaryMarket(purchaseToken);
 
-//         // Mint a ticket for Alice
-//         ticketNFT.mint(alice, "Alice");
-//         ticketId = 1; // Assuming ticketId is 1 for the first mint
+        payable(alice).transfer(1e18);
+        payable(bob).transfer(2e18);
 
-//         // Setting up balances and approvals
-//         purchaseToken.mint{value: 10 ether}(alice);
-//         purchaseToken.mint{value: 10 ether}(bob);
-//         purchaseToken.approve(address(secondaryMarket), type(uint256).max, alice);
-//         purchaseToken.approve(address(secondaryMarket), type(uint256).max, bob);
-//     }
+        ticketNFT = new TicketNFT("Event", 100, charlie, address(this));
+        ticketNFT.mint(alice, "Alice");
+        ticketId = 1;  // Assuming ticketId is 1 for the first mint
+    }
 
-//     // Test listing a ticket
-//     function testListTicket() public {
-//         vm.startPrank(alice);
-//         ticketNFT.approve(address(secondaryMarket), ticketId);
-//         vm.expectEmit(true, true, true, true);
-//         emit SecondaryMarket.Listing(alice, address(ticketNFT), ticketId, 1 ether);
-//         secondaryMarket.listTicket(address(ticketNFT), ticketId, 1 ether);
-//         vm.stopPrank();
-//     }
+    function prepareAliceWithTokensAndApproval(uint256 amount) internal {
+        vm.startPrank(alice);
+        purchaseToken.mint{value: amount}();
+        purchaseToken.approve(address(secondaryMarket), amount);
+        vm.stopPrank();
+    }
 
-//     // Test submitting a bid
-//     function testSubmitBid() public {
-//         testListTicket(); // First list the ticket
+    function prepareBobWithTokensAndApproval(uint256 amount) internal {
+        vm.startPrank(bob);
+        purchaseToken.mint{value: amount}();
+        purchaseToken.approve(address(secondaryMarket), amount);
+        vm.stopPrank();
+    }
 
-//         vm.startPrank(bob);
-//         vm.expectEmit(true, true, true, true);
-//         emit ISecondaryMarket.Submitted(bob, address(ticketNFT), ticketId, 1.5 ether, "Bob");
-//         secondaryMarket.submitBid(address(ticketNFT), ticketId, 1.5 ether, "Bob");
-//         vm.stopPrank();
-//     }
+    function testListTicket() public {
+        prepareAliceWithTokensAndApproval(1 ether);
+        vm.startPrank(alice);
+        ticketNFT.approve(address(secondaryMarket), ticketId);
+        secondaryMarket.listTicket(address(ticketNFT), ticketId, 1 ether);
+        vm.stopPrank();
+    }
 
-//     // Test accepting a bid
-//     function testAcceptBid() public {
-//         testSubmitBid(); // First submit a bid
+    function testSubmitBid() public {
+        testListTicket();
+        prepareBobWithTokensAndApproval(1.5 ether);
+        vm.startPrank(bob);
+        secondaryMarket.submitBid(address(ticketNFT), ticketId, 1.5 ether, "Bob");
+        vm.stopPrank();
+    }
 
-//         vm.startPrank(alice);
-//         vm.expectEmit(true, true, true, true);
-//         emit ISecondaryMarket.BidAccepted(bob, address(ticketNFT), ticketId, 1.5 ether, "Bob");
-//         secondaryMarket.acceptBid(address(ticketNFT), ticketId);
-//         vm.stopPrank();
-//     }
+    function testAcceptBid() public {
+        testSubmitBid();
+        vm.startPrank(alice);
+        secondaryMarket.acceptBid(address(ticketNFT), ticketId);
+        vm.stopPrank();
+    }
 
-//     // Test delisting a ticket
-//     function testDelistTicket() public {
-//         testListTicket(); // First list the ticket
+    function testDelistTicket() public {
+        testListTicket();
+        vm.startPrank(alice);
+        secondaryMarket.delistTicket(address(ticketNFT), ticketId);
+        vm.stopPrank();
+    }
 
-//         vm.startPrank(alice);
-//         vm.expectEmit(true, true, false, false);
-//         emit ISecondaryMarket.Delisting(address(ticketNFT), ticketId);
-//         secondaryMarket.delistTicket(address(ticketNFT), ticketId);
-//         vm.stopPrank();
-//     }
+    function testFailListTicketNotOwner() public {
+        vm.startPrank(bob); // Bob, who is not the owner, tries to list the ticket
+        ticketNFT.mint(alice, "Alice");
+        ticketId = 1; // Assuming the first minted ticketId is 1
+        vm.expectRevert("Caller is not ticket owner");
+        secondaryMarket.listTicket(address(ticketNFT), ticketId, 1 ether);
+        vm.stopPrank();
+    }
 
-//     // Additional tests can be added for edge cases and failure scenarios
-// }
+
+    function testFailSubmitBidLowAmount() public {
+        testListTicket();
+        prepareBobWithTokensAndApproval(0.5 ether);
+        vm.startPrank(bob);
+        vm.expectRevert("Bid must be higher than the current highest");
+        secondaryMarket.submitBid(address(ticketNFT), ticketId, 0.5 ether, "Bob");
+        vm.stopPrank();
+    }
+
+    function testFailAcceptBidNotSeller() public {
+        // Ensure Alice lists the ticket and Bob makes a bid
+        testListTicket();
+        testSubmitBid();
+
+        vm.startPrank(charlie); // Charlie, not the seller, tries to accept the bid
+        vm.expectRevert("Only seller can accept bid");
+        secondaryMarket.acceptBid(address(ticketNFT), ticketId);
+        vm.stopPrank();
+    }
+
+    function testFailDelistTicketNotSeller() public {
+        testListTicket(); // Alice lists the ticket
+        vm.prank(charlie);
+        vm.startPrank(charlie); // Charlie, not the seller, tries to delist
+        vm.expectRevert("Only seller can delist");
+        secondaryMarket.delistTicket(address(ticketNFT), ticketId);
+        vm.stopPrank();
+    }
+}
