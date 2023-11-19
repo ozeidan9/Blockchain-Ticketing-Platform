@@ -30,10 +30,8 @@ contract PrimaryMarket is IPrimaryMarket {
     ) external override returns (ITicketNFT ticketCollection) {
         require(eventToTicketNFT[eventName] == address(0), "Event already exists");
 
-        // Deploy a new TicketNFT contract
         TicketNFT newTicketNFT = new TicketNFT(eventName, maxNumberOfTickets, msg.sender, address(this));
         
-        // Save the event details
         eventToTicketNFT[eventName] = address(newTicketNFT);
         ticketNFTDetails[address(newTicketNFT)] = EventDetails({
             creator: msg.sender,
@@ -42,7 +40,6 @@ contract PrimaryMarket is IPrimaryMarket {
             ticketsMinted: 0
         });
 
-        // Emit the EventCreated event with all required parameters
         emit EventCreated(
             msg.sender, 
             address(newTicketNFT), 
@@ -64,12 +61,12 @@ contract PrimaryMarket is IPrimaryMarket {
     ) external override returns (uint256 id) {
         EventDetails storage details = ticketNFTDetails[ticketCollection];
         require(details.ticketsMinted < details.maxNumberOfTickets, "All tickets have been minted");
+
         paymentToken.transferFrom(msg.sender, details.creator, details.price);
         uint256 newTicketId = ITicketNFT(ticketCollection).mint(msg.sender, holderName);
         details.ticketsMinted++;
 
         emit Purchase(msg.sender, ticketCollection, newTicketId, holderName);
-
         return newTicketId;
     }
 }

@@ -44,7 +44,6 @@ contract SecondaryMarket is ISecondaryMarket {
         );
         
         
-        // Transfer the ticket to this contract
         ITicketNFT(ticketCollection).transferFrom(msg.sender, address(this), ticketID);
         ITicketNFT(ticketCollection).approve(address(this), ticketID);
 
@@ -77,19 +76,15 @@ contract SecondaryMarket is ISecondaryMarket {
         );
         require(listing.isListed, "Ticket not listed"); 
         
-        // Refund the previous highest bidder        
         BidDetails memory currentHighestBid = ticketBids[ticketCollection][ticketID]; 
         if (currentHighestBid.amount > 0 && currentHighestBid.bidder != address(0)) { 
             purchaseToken.transfer(currentHighestBid.bidder, currentHighestBid.amount); 
         }
-        // Transfer the new bid amount to the contract       
+
         purchaseToken.transferFrom(msg.sender, address(this), bidAmount); 
         purchaseToken.approve(address(this), bidAmount);
     
-        // Update the highest bid        
         ticketBids[ticketCollection][ticketID] = BidDetails(name, msg.sender, bidAmount);
-
-        // Emit an event for the new highest bid        
         emit BidSubmitted(msg.sender, ticketCollection, ticketID, bidAmount, name);
     }
 
@@ -100,17 +95,15 @@ contract SecondaryMarket is ISecondaryMarket {
         require(listing.isListed, "Ticket not listed"); 
 
         BidDetails memory bid = ticketBids[ticketCollection][ticketID];
-         // Calculate and transfer fees      
+
         uint256 fee = calculateFee(bid.amount);
         purchaseToken.transfer(ITicketNFT(ticketCollection).creator(), fee);
-        // Transfer funds to seller minus fee       
         purchaseToken.transfer(listing.seller, bid.amount - fee);
         
-        // Transfer ticket to winning bidder
         ITicketNFT(ticketCollection).updateHolderName(ticketID, bid.name); 
         ITicketNFT(ticketCollection).transferFrom(address(this), bid.bidder, ticketID);
         emit BidAccepted(bid.bidder, ticketCollection, ticketID, bid.amount, "");
-        // Clear listing and bid    
+       
         delete ticketBids[ticketCollection][ticketID];
         delete List[ticketCollection];
     }
@@ -121,18 +114,14 @@ contract SecondaryMarket is ISecondaryMarket {
         require(listing.isListed, "Ticket not listed"); 
         require(listing.seller == msg.sender, "Only seller can delist");
         
-        // Return bid amount to the current highest bidder        
         BidDetails memory currentBid = ticketBids[ticketCollection][ticketID]; 
         if (currentBid.amount > 0 && currentBid.bidder != address(0)) { 
             purchaseToken.transfer(currentBid.bidder, currentBid.amount); 
         }
         
-        // Transfer ticket back to the seller        
         ITicketNFT(ticketCollection).transferFrom(address(this), listing.seller, ticketID);
         
-        // Clear listing and bid
         emit Delisting(ticketCollection, ticketID);
-
         delete List[ticketCollection];
     }
 
@@ -143,7 +132,6 @@ contract SecondaryMarket is ISecondaryMarket {
         return ticketBids[ticketCollection][ticketID].bidder; 
     }
     function calculateFee(uint256 amount) private pure returns (uint256) {
-        // Calculate fee, for example, 5%
         return (amount * FEE_PERCENTAGE) / 100;
     }
     function getSaleDetails(address ticketCollection) external view returns (SaleDetails memory) {

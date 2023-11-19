@@ -18,13 +18,11 @@ contract TicketNFTTest is Test {
     event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId);
 
     function setUp() public {
-        // Corrected the constructor call with four parameters
         ticketNFT = new TicketNFT("Charlie's concert", 100, charlie, primaryMarket);
     }
 
-    // TESTS FOR SUCCESS
     function testMint() public {
-        vm.startPrank(charlie); // Assuming charlie is the creator or primary market
+        vm.startPrank(charlie); 
         emit Transfer(address(0), alice, 1);
         ticketNFT.mint(alice, "Alice");
         vm.stopPrank();
@@ -108,9 +106,8 @@ contract TicketNFTTest is Test {
         vm.stopPrank();
     } 
 
-    // Additional test example
     function testMintAsPrimaryMarket() public {
-        vm.startPrank(primaryMarket); // Simulate as primary market
+        vm.startPrank(primaryMarket); 
         vm.expectEmit(true, true, true, true);
         emit Transfer(address(0), alice, 1);
         uint256 ticketID = ticketNFT.mint(alice, "Alice");
@@ -120,10 +117,9 @@ contract TicketNFTTest is Test {
     }
 
 
-// TESTS FOR FAILURES
 
     function testMintAsNonOwner() public {
-        vm.prank(bob); // Bob is not the creator or primary market
+        vm.prank(bob);
         vm.expectRevert("Caller is not the creator");
         ticketNFT.mint(alice, "Alice");
     }
@@ -138,12 +134,11 @@ contract TicketNFTTest is Test {
         vm.startPrank(charlie);
         ticketNFT.mint(alice, "Alice");
         vm.stopPrank();
-        // Attempt to transfer from zero address should fail with "Invalid from or to address".
+
         vm.prank(alice);
         vm.expectRevert("Invalid from or to address");
         ticketNFT.transferFrom(address(0), bob, 1);
 
-        // Attempt to transfer to zero address should fail with "Invalid from or to address".
         vm.prank(alice);
         vm.expectRevert("Invalid from or to address");
         ticketNFT.transferFrom(alice, address(0), 1);
@@ -153,7 +148,7 @@ contract TicketNFTTest is Test {
         vm.startPrank(charlie);
         ticketNFT.mint(alice, "Alice");
         vm.stopPrank();
-        // Bob attempting to transfer Alice's ticket should fail with "Transfer of ticket that is not own".
+
         vm.prank(bob);
         vm.expectRevert("Caller is not owner nor approved");
         ticketNFT.transferFrom(alice, bob, 1);

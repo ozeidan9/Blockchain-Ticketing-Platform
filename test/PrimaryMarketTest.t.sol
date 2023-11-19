@@ -21,7 +21,6 @@ contract PrimaryMarketTest is Test {
 
     function setUp() public {
         purchaseToken = new PurchaseToken();
-        // Updated constructor parameters
         primaryMarket = new PrimaryMarket(purchaseToken);
         secondaryMarket = new SecondaryMarket(purchaseToken);
 
@@ -29,18 +28,15 @@ contract PrimaryMarketTest is Test {
         payable(bob).transfer(2e18);
     }
 
-    // Tests for success (i.e., nominal behavior)
     function testCreateNewEvent() public {
         uint256 ticketPrice = 2e18;
         vm.prank(charlie);
         ITicketNFT ticketNFT;
 
-        // vm.expectEmit(true, true, true, true);
         emit EventCreated(charlie, address(ticketNFT), "Charlie's concert", ticketPrice, 1500);
         ticketNFT = primaryMarket.createNewEvent("Charlie's concert", ticketPrice, 1500);
 
         assertEq(ticketNFT.creator(), charlie);
-        //console.log("primaryMarket.getPrice(address(ticketNFT))", primaryMarket.getPrice(address(ticketNFT)));
         assertEq(ticketNFT.maxNumberOfTickets(), 1500);
         assertEq(primaryMarket.getPrice(address(ticketNFT)), ticketPrice);
     }
@@ -68,17 +64,16 @@ contract PrimaryMarketTest is Test {
         vm.stopPrank();
     }
 
-    // Tests for failure (i.e., unexpected behavior and should revert)
     function testPurchaseNotEnoughBalance() public {
         uint256 ticketPrice = 2987698766544e18;
 
         vm.prank(charlie);
         ITicketNFT ticketNFT = primaryMarket.createNewEvent("Charlie's concert", ticketPrice, 1500);
 
-        vm.startPrank(alice); // Updated revert message
+        vm.startPrank(alice); 
         vm.expectRevert("ERC20: insufficient allowance");
         uint256 id = primaryMarket.purchase(address(ticketNFT), "Alice");
-        id++; // to silence unused variable warning
+        id++; 
 
         vm.stopPrank();
     }
@@ -97,8 +92,7 @@ contract PrimaryMarketTest is Test {
         emit Purchase(alice, address(ticketNFT), 1, "Alice");
         uint256 id_1 = primaryMarket.purchase(address(ticketNFT), "Alice");
 
-        // Try to buy another ticket should revert
-        vm.expectRevert("All tickets have been minted"); // Updated revert message
+        vm.expectRevert("All tickets have been minted"); 
         id_1 = primaryMarket.purchase(address(ticketNFT), "Alice");
 
         vm.stopPrank();
