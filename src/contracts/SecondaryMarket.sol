@@ -46,7 +46,7 @@ contract SecondaryMarket is ISecondaryMarket {
         
         // Transfer the ticket to this contract
         ITicketNFT(ticketCollection).transferFrom(msg.sender, address(this), ticketID);
-        ITicketNFT(ticketCollection).approve(address(this),ticketID);
+        ITicketNFT(ticketCollection).approve(address(this), ticketID);
 
         List[ticketCollection] = SaleDetails({ 
             seller: msg.sender, 
@@ -111,6 +111,7 @@ contract SecondaryMarket is ISecondaryMarket {
         emit BidAccepted(bid.bidder, ticketCollection, ticketID, bid.amount, "");
         // Clear listing and bid    
         delete ticketBids[ticketCollection][ticketID];
+        delete List[ticketCollection];
     }
 
     function delistTicket(address ticketCollection, uint256 ticketID) external override {
@@ -129,8 +130,9 @@ contract SecondaryMarket is ISecondaryMarket {
         ITicketNFT(ticketCollection).transferFrom(address(this), listing.seller, ticketID);
         
         // Clear listing and bid
-        delete ticketBids[ticketCollection][ticketID];
         emit Delisting(ticketCollection, ticketID);
+
+        delete List[ticketCollection];
     }
 
     function getHighestBid(address ticketCollection, uint256 ticketID) external view override returns (uint256) { 
