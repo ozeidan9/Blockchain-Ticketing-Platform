@@ -96,8 +96,9 @@ contract SecondaryMarket is ISecondaryMarket {
     function acceptBid(address ticketCollection, uint256 ticketID) external override {
 
         SaleDetails memory listing = List[ticketCollection]; 
-        // require(listing.isListed, "Ticket not listed"); 
         require(listing.seller == msg.sender, "Only seller can accept bid");
+        require(listing.isListed, "Ticket not listed"); 
+
         BidDetails memory bid = ticketBids[ticketCollection][ticketID];
          // Calculate and transfer fees      
         uint256 fee = calculateFee(bid.amount);
@@ -117,8 +118,8 @@ contract SecondaryMarket is ISecondaryMarket {
     function delistTicket(address ticketCollection, uint256 ticketID) external override {
 
         SaleDetails memory listing = List[ticketCollection];
-        require(listing.seller == msg.sender, "Only seller can delist");
         require(listing.isListed, "Ticket not listed"); 
+        require(listing.seller == msg.sender, "Only seller can delist");
         
         // Return bid amount to the current highest bidder        
         BidDetails memory currentBid = ticketBids[ticketCollection][ticketID]; 
