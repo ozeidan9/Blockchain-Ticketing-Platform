@@ -132,7 +132,6 @@ contract SecondaryMarketTest is Test {
         vm.stopPrank();
 
         SecondaryMarket.SaleDetails memory listing = secondaryMarket.getSaleDetails(address(ticketNFT));
-        console.log("listing.isListed", listing.isListed);
         assertFalse(listing.isListed);
     }
 
