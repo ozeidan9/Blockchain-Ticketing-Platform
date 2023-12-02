@@ -20,9 +20,6 @@ Utilizing Foundry, a powerful development environment and testing framework, thi
 - **ERC20 Token Implementation**: A standard Ethereum token contract for demonstration and usage.
 - **Foundry Framework**: Utilized for smart contract compilation, deployment, and testing.
 
-## Getting Started
-These instructions will guide you through setting up the project environment for development and experimentation.
-
 ### Prerequisites
 - Foundry (Latest Stable Version)
 - Solidity Compiler
